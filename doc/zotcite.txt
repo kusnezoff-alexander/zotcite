@@ -33,8 +33,9 @@ description of its features, including screenshots at:
 ------------------------------------------------------------------------------
 2.1. Commands                                               *zotcite_commands*
 
-You can use the command `:Zseek` to see what references have either a last
-author's name or title matching the pattern that you are seeking for. Example:
+You can use the command `:Zseek` to search for references and insert the
+selected citation key at the current cursor position. The search pattern matches
+either a last author's name or title. Example:
 >vim
  :Zseek marx
 

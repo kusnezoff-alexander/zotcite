@@ -177,10 +177,8 @@ local global_init = function()
 
     vim.api.nvim_create_user_command(
         "Zseek",
-        function(tbl)
-            require("zotcite.seek").refs(tbl.args, require("zotcite.seek").print)
-        end,
-        { nargs = "?", desc = "Zotcite: seek references" }
+        function(tbl) require("zotcite.get").citation(tbl.args) end,
+        { nargs = "?", desc = "Zotcite: seek and insert references" }
     )
     vim.api.nvim_create_user_command(
         "Znote",

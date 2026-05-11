@@ -178,21 +178,25 @@ local finish_citation = function(ref)
     vim.schedule(require("zotcite.hl").citations)
 end
 
-M.citation = function()
-    local argmt = ""
+--- Search and insert citation
+---@param argmt string? Optional search pattern
+M.citation = function(argmt)
     local line = vim.api.nvim_get_current_line()
     local last = vim.api.nvim_win_get_cursor(0)[2]
     citation.start_col = last
     citation.end_col = last
-    local c = line:sub(last, last):lower()
-    if (c >= "a" and c <= "z") or c > "\127" then
-        local first = last - 1
-        while first > 0 and ((c >= "a" and c <= "z") or c > "\127") do
-            first = first - 1
-            c = line:sub(first, first):lower()
+    if not argmt or argmt == "" then
+        argmt = ""
+        local c = line:sub(last, last):lower()
+        if (c >= "a" and c <= "z") or c > "\127" then
+            local first = last - 1
+            while first > 0 and ((c >= "a" and c <= "z") or c > "\127") do
+                first = first - 1
+                c = line:sub(first, first):lower()
+            end
+            argmt = line:sub(first + 1, last):lower()
+            citation.start_col = first
         end
-        argmt = line:sub(first + 1, last):lower()
-        citation.start_col = first
     end
     seek.refs(argmt, finish_citation)
 end
