@@ -10,6 +10,7 @@ local sel_list = {}
 local citation = {
     start_col = 0,
     end_col = 0,
+    from_command = false,
 }
 
 local M = {}
@@ -174,19 +175,23 @@ local finish_citation = function(ref)
     )
     local colnr = citation.start_col + #cite
     vim.api.nvim_win_set_cursor(0, { rownr + 1, colnr })
-    vim.api.nvim_feedkeys("a", "n", false)
+    if not citation.from_command then
+        vim.api.nvim_feedkeys("a", "n", false)
+    end
     vim.schedule(require("zotcite.hl").citations)
 end
 
 --- Search and insert citation
----@param argmt string? Optional search pattern
+---@param argmt string? Optional search pattern; when non-nil the call originates from a normal-mode command (:Zseek)
 M.citation = function(argmt)
-    local line = vim.api.nvim_get_current_line()
+    citation.from_command = argmt ~= nil
     local last = vim.api.nvim_win_get_cursor(0)[2]
     citation.start_col = last
     citation.end_col = last
-    if not argmt or argmt == "" then
+    if not citation.from_command and (not argmt or argmt == "") then
+        -- insert-mode only: detect word under cursor to pre-filter and replace it
         argmt = ""
+        local line = vim.api.nvim_get_current_line()
         local c = line:sub(last, last):lower()
         if (c >= "a" and c <= "z") or c > "\127" then
             local first = last - 1
@@ -198,7 +203,7 @@ M.citation = function(argmt)
             citation.start_col = first
         end
     end
-    seek.refs(argmt, finish_citation)
+    seek.refs(argmt or "", finish_citation)
 end
 
 M.abstract = function()
