@@ -161,7 +161,17 @@ local finish_citation = function(ref)
     if not ref then return end
     local rownr = vim.api.nvim_win_get_cursor(0)[1] - 1
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-    local cite = kt == "zotero" and ref.value.key or ref.value.cite
+    local cite
+    if kt == "zotero" then
+        -- Insert the legacy "<zoterokey>#<citekey>" form so new citations match
+        -- existing notes. The "#<citekey>" suffix is concealed in the editor and
+        -- stripped by scripts/zotref.lua at render time. Fall back to the bare key
+        -- when the item has no citekey.
+        cite = ref.value.cite and (ref.value.key .. "#" .. ref.value.cite)
+            or ref.value.key
+    else
+        cite = ref.value.cite
+    end
     if not (vim.bo.filetype == "tex" or vim.bo.filetype == "rnoweb") then
         cite = "@" .. cite
     end
