@@ -797,6 +797,22 @@ function M.get_all_citations()
     return res
 end
 
+--- Build the citation key text to insert (without the leading "@"). Shared by
+--- every insertion path (the `:Zseek`/telescope picker and the LSP completion)
+--- so they cannot diverge. In zotero mode this is the legacy
+--- "<zoterokey>#<citekey>" form (falling back to the bare key when there is no
+--- citekey); otherwise it is the template/Better-BibTeX citekey.
+---@param zotkey string Zotero item key
+---@param citekey string|nil Template/Better-BibTeX citation key
+---@param kt string Key type: "zotero" | "template" | "better-bibtex"
+---@return string
+function M.format_citation_key(zotkey, citekey, kt)
+    if kt == "zotero" then
+        return citekey and (zotkey .. "#" .. citekey) or zotkey
+    end
+    return citekey
+end
+
 local get_ref_data_template = function(citekey)
     for _, v in pairs(entry) do
         if v.citekey == citekey then return v end

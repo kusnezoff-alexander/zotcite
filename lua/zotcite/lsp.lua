@@ -81,7 +81,7 @@ local complete = function(callback, lnum, char)
                 label = txt,
                 kind = vim.lsp.protocol.CompletionItemKind.Variable,
                 textEdit = {
-                    newText = kt == "zotero" and v.zotkey or v.citekey,
+                    newText = zotero.format_citation_key(v.zotkey, v.citekey, kt),
                     range = text_edit_range,
                 },
             })
