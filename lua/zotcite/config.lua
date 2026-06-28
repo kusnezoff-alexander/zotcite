@@ -296,6 +296,12 @@ M.init = function()
         "InsertLeave",
         { buffer = bnr, callback = require("zotcite.hl").citations }
     )
+    -- Refresh after normal-mode edits (e.g. `dd`, `p`, `u`) so concealed keys and
+    -- their virtual text don't linger as stale extmarks on deleted/changed lines.
+    vim.api.nvim_create_autocmd(
+        "TextChanged",
+        { buffer = bnr, callback = require("zotcite.hl").citations }
+    )
     vim.api.nvim_create_autocmd(
         "BufWritePre",
         { buffer = bnr, callback = require("zotcite.bib").update }
