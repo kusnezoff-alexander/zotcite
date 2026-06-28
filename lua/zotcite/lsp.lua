@@ -122,7 +122,7 @@ local hover = function(lnum, char)
     if ktnz then
         i, j = line:find(key)
     else
-        i, j = line:find(key .. "[%w%-0-9]*")
+        i, j = line:find(key .. "[%w%-#+0-9]*")
     end
     if i then
         return {
@@ -168,7 +168,7 @@ local function lsp_request(method, params, callback, _)
         local key = params.textEdit.newText
 
         local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-        if kt == "zotero" then key = key:gsub("%-.*", "") end
+        if kt == "zotero" then key = key:gsub("[%-#+].*", "") end
         local ttl, doc = resolve(key)
         if ttl then
             params.detail = ttl

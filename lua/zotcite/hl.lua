@@ -87,8 +87,15 @@ local vt_citations_md = function(ac, ns, lines)
             local s, e = v:find(kp, i)
             if not s or not e then break end
             a = ac[v:sub(s + 1, e)]
-            vt_citation(ns, k, s, e, s, a)
-            i = e + 1
+            local ce = e
+            if kt == "zotero" then
+                -- Legacy support: also conceal a trailing "#"/"+" human-readable
+                -- suffix (old "@<zoterokey>#<visible>" citation key format)
+                local _, se = v:find("^[#+][%w_%+%-]*", e + 1)
+                if se then ce = se end
+            end
+            vt_citation(ns, k, s, ce, s, a)
+            i = ce + 1
         end
     end
 end
