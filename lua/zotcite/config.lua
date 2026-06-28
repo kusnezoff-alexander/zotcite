@@ -292,10 +292,37 @@ M.init = function()
         "Zotcite: Paste abstract note in current buffer"
     )
     if config.conceallevel >= 0 then vim.o.conceallevel = config.conceallevel end
-    vim.api.nvim_create_autocmd(
-        "InsertLeave",
-        { buffer = bnr, callback = require("zotcite.hl").citations }
-    )
+    -- While editing a line in insert mode the citation key is revealed (conceal
+    -- is off on the cursor line), so suppress the virtual text there to avoid a
+    -- duplicated label; restore it on leave. CursorMovedI only refreshes when the
+    -- edited line changes, so typing (and completion) on one line stays cheap.
+    vim.api.nvim_create_autocmd("InsertEnter", {
+        buffer = bnr,
+        callback = function()
+            local hl = require("zotcite.hl")
+            hl.set_insert_line(vim.api.nvim_win_get_cursor(0)[1])
+            hl.citations()
+        end,
+    })
+    vim.api.nvim_create_autocmd("CursorMovedI", {
+        buffer = bnr,
+        callback = function()
+            local hl = require("zotcite.hl")
+            local lnum = vim.api.nvim_win_get_cursor(0)[1]
+            if hl.get_insert_line() ~= lnum then
+                hl.set_insert_line(lnum)
+                hl.citations()
+            end
+        end,
+    })
+    vim.api.nvim_create_autocmd("InsertLeave", {
+        buffer = bnr,
+        callback = function()
+            local hl = require("zotcite.hl")
+            hl.set_insert_line(nil)
+            hl.citations()
+        end,
+    })
     -- Refresh after normal-mode edits (e.g. `dd`, `p`, `u`) so concealed keys and
     -- their virtual text don't linger as stale extmarks on deleted/changed lines.
     vim.api.nvim_create_autocmd(
