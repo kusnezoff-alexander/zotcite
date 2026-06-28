@@ -12,22 +12,47 @@ local vt_citation = function(ns, i, s, e, c, a)
     if not a then return end
     local set_m = vim.api.nvim_buf_set_extmark
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
+    -- `invalidate` makes a mark hide itself when the text it spans is deleted, so
+    -- concealed keys and their inline virtual text don't linger after e.g. `dd`.
     if kt == "zotero" then
         a = a:gsub("%-", "_")
-        set_m(0, ns, i - 1, s - 1, { end_col = e, hl_group = "Ignore", conceal = "" })
         set_m(
             0,
             ns,
             i - 1,
-            c,
-            { virt_text = { { a, "Identifier" } }, virt_text_pos = "inline" }
+            s - 1,
+            { end_col = e, hl_group = "Ignore", conceal = "", invalidate = true }
         )
+        -- give the virtual-text mark a range (end_col) so it, too, can invalidate
+        set_m(0, ns, i - 1, c, {
+            end_col = e,
+            virt_text = { { a, "Identifier" } },
+            virt_text_pos = "inline",
+            invalidate = true,
+        })
     else
         if vim.tbl_contains({ "tex", "rnoweb", "bib" }, vim.bo.filetype) then
-            set_m(0, ns, i - 1, s - 1, { end_col = e, hl_group = "Identifier" })
+            set_m(
+                0,
+                ns,
+                i - 1,
+                s - 1,
+                { end_col = e, hl_group = "Identifier", invalidate = true }
+            )
         else
-            set_m(0, ns, i - 1, s - 1, { end_col = s, hl_group = "Ignore", conceal = "" })
-            set_m(0, ns, i - 1, s, { end_col = e, hl_group = "Identifier" })
+            set_m(0, ns, i - 1, s - 1, {
+                end_col = s,
+                hl_group = "Ignore",
+                conceal = "",
+                invalidate = true,
+            })
+            set_m(
+                0,
+                ns,
+                i - 1,
+                s,
+                { end_col = e, hl_group = "Identifier", invalidate = true }
+            )
         end
     end
 end
