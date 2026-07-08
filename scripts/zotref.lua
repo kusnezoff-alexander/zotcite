@@ -8,10 +8,11 @@ before citeproc resolved the key against the generated .bib. That Python filter
 was removed when the bib generator moved into Lua.
 
 This filter restores that behaviour for documents that still use the legacy
-format: it strips a trailing "#..."/"+..." suffix from every citation id so the
-id matches the zotero-key-based entry written into the .bib by bib.lua. A "-"
-suffix is deliberately left untouched, since template/better-bibtex citation
-keys may legitimately contain hyphens.
+format: it strips a trailing "#..."/"-..."/"+..." visible suffix so the id
+matches the zotero-key-based entry written into the .bib by bib.lua. The suffix
+is only stripped when the id begins with an 8-character Zotero item key
+([0-9A-Z]); template/better-bibtex citation keys (e.g. "cryptographyyear" or
+"Smith-2020") are left untouched, since they may legitimately contain hyphens.
 
 Usage (Markdown/Quarto, run BEFORE --citeproc):
   pandoc --lua-filter=/path/to/zotcite/scripts/zotref.lua --citeproc in.md -o out.pdf
@@ -23,7 +24,10 @@ or in a Quarto YAML header:
 
 function Cite(el)
     for _, c in ipairs(el.citations) do
-        c.id = c.id:gsub("[#+].*", "")
+        c.id = c.id:gsub(
+            "^([0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z])[#%-+].*$",
+            "%1"
+        )
     end
     return el
 end

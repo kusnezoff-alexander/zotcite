@@ -115,9 +115,8 @@ local find_bib_fn = function()
     return find_markdown_bib()
 end
 
-local get_typ_citations = function(kz)
-    local kp = kz and "<[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]>"
-        or "<[%w%-\192-\244\128-\191]+>"
+local get_typ_citations = function(_kz)
+    local kp = "<[%w%-\192-\244\128-\191]+>"
     local ckeys = {}
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, true)
     for _, v in pairs(lines) do
@@ -132,9 +131,11 @@ local get_typ_citations = function(kz)
     return ckeys
 end
 
-local get_md_citations = function(kz)
-    local kp = kz and "@[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]"
-        or "@[%w%-\192-\244\128-\191]+"
+local get_md_citations = function(_kz)
+    -- One pattern for both key types; zotero-mode tokens (8-char keys, possibly
+    -- with a "#"/"-"/"+" suffix) and "{title}{year}" template keys are all
+    -- resolved downstream in zotero.get_bib via parse_key.
+    local kp = "@[%w%-\192-\244\128-\191]+"
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, true)
     local ckeys = {}
     for _, v in pairs(lines) do
@@ -149,10 +150,9 @@ local get_md_citations = function(kz)
     return ckeys
 end
 
-local get_tex_citations = function(kz)
+local get_tex_citations = function(_kz)
     local kp1 = "\\%w*cit.*{"
-    local kp2 = kz and "[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]"
-        or "[%w%-\192-\244\128-\191]+"
+    local kp2 = "[%w%-\192-\244\128-\191]+"
     local ckeys = {}
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, true)
     for _, v in pairs(lines) do
@@ -175,15 +175,14 @@ end
 
 M.update = function()
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-    local kz = kt == "zotero"
     local ckeys
     if vim.o.filetype == "tex" or vim.o.filetype == "rnoweb" then
-        ckeys = get_tex_citations(kz)
+        ckeys = get_tex_citations()
     else
-        ckeys = get_md_citations(kz)
+        ckeys = get_md_citations()
     end
     if vim.o.filetype == "typst" then
-        local ck2 = get_typ_citations(kz)
+        local ck2 = get_typ_citations()
         for _, v in pairs(ck2) do
             table.insert(ckeys, v)
         end

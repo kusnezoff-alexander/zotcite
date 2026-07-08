@@ -117,10 +117,11 @@ local vt_citations_bib = function(lines, ns)
 end
 
 local vt_citations_md = function(ac, ns, lines, iline)
+    local zotero = require("zotcite.zotero")
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-    local kp = kt == "zotero"
-            and "@[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]"
-        or "@[%w%-\192-\244\128-\191]+"
+    -- One pattern for both modes; in zotero mode the token is then classified via
+    -- parse_key so 8-char keys and "{title}{year}" template keys both resolve.
+    local kp = "@[%w%-\192-\244\128-\191]+"
     local a = ""
     for k, v in pairs(lines) do
         local i = 1
@@ -128,11 +129,13 @@ local vt_citations_md = function(ac, ns, lines, iline)
         while i < imax do
             local s, e = v:find(kp, i)
             if not s or not e then break end
-            a = ac[v:sub(s + 1, e)]
+            local tok = v:sub(s + 1, e)
+            a = ac[kt == "zotero" and (zotero.parse_key(tok)) or tok]
             local ce = e
             if kt == "zotero" then
                 -- Legacy support: also conceal a trailing "#"/"+" human-readable
-                -- suffix (old "@<zoterokey>#<visible>" citation key format)
+                -- suffix (old "@<zoterokey>#<visible>" citation key format). A
+                -- trailing "-<visible>" suffix is already inside the match above.
                 local _, se = v:find("^[#+][%w_%+%-]*", e + 1)
                 if se then ce = se end
             end
@@ -143,10 +146,9 @@ local vt_citations_md = function(ac, ns, lines, iline)
 end
 
 local vt_citations_typ = function(ac, ns, lines, iline)
+    local zotero = require("zotcite.zotero")
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-    local kp = kt == "zotero"
-            and "<[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]>"
-        or "<[%w%-\192-\244\128-\191]+>"
+    local kp = "<[%w%-\192-\244\128-\191]+>"
     local a = ""
     for k, v in pairs(lines) do
         local i = 1
@@ -154,7 +156,8 @@ local vt_citations_typ = function(ac, ns, lines, iline)
         while i < imax do
             local s, e = v:find(kp, i)
             if not s or not e then break end
-            a = ac[v:sub(s + 1, e - 1)]
+            local tok = v:sub(s + 1, e - 1)
+            a = ac[kt == "zotero" and (zotero.parse_key(tok)) or tok]
             vt_citation(ns, k, s, e, e, a, k == iline)
             i = e + 1
         end
@@ -162,11 +165,10 @@ local vt_citations_typ = function(ac, ns, lines, iline)
 end
 
 local vt_citations_tex = function(ac, ns, lines, iline)
+    local zotero = require("zotcite.zotero")
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
     local kp1 = "\\%w*cit.*{"
-    local kp2 = kt == "zotero"
-            and "[0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z]"
-        or "[%w%-\192-\244\128-\191]+"
+    local kp2 = "[%w%-\192-\244\128-\191]+"
     local a = ""
     for k, v in pairs(lines) do
         local i = 1
@@ -180,7 +182,8 @@ local vt_citations_tex = function(ac, ns, lines, iline)
             while j < l do
                 local s2, e2 = v:find(kp2, j)
                 if not s2 or not e2 then break end
-                a = ac[v:sub(s2, e2)]
+                local tok = v:sub(s2, e2)
+                a = ac[kt == "zotero" and (zotero.parse_key(tok)) or tok]
                 vt_citation(ns, k, s2, e2, e2, a, k == iline)
                 j = e2 + 1
             end
