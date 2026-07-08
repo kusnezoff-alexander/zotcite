@@ -111,10 +111,9 @@ local hover = function(lnum, char)
     local subline = pre .. pos
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
     local ktnz = kt ~= "zotero"
-    local key = ktnz and subline:match("^([%w%-\192-\244\128-\191]+)")
-        or subline:match(
-            "^([0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z])"
-        )
+    -- Match the whole token; get_ref_data (via parse_key) then classifies it as
+    -- an 8-char Zotero key or a "{title}{year}" template key.
+    local key = subline:match("^([%w%-\192-\244\128-\191]+)")
     if not key then return {} end
     local ttl, doc = resolve(key)
     if not ttl then return {} end

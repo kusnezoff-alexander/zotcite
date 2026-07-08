@@ -171,6 +171,44 @@ end
 
 local M = {}
 
+--- Classify a raw citation token (the text after '@'/'<'/'>', without any
+--- leading sigil) when the buffer uses the "zotero" key_type. A Zotero item key
+--- is exactly 8 characters of [0-9A-Z]; it may be followed by a visible suffix
+--- introduced by '#', '-' or '+' (the legacy "@<zoterokey><sep><visible>"
+--- forms). Anything else - e.g. a "{title}{year}" template key such as
+--- "32308year" - is treated as a template citation key so both schemes can
+--- coexist in the same document.
+---@param token string
+---@return string key  # zotero item key, or the whole token for template keys
+---@return string scheme  # "zotero" or "template"
+function M.parse_key(token)
+    local zk = token:match(
+        "^([0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z][0-9A-Z])"
+    )
+    if zk and (#token == 8 or token:find("^[#%-+]", 9)) then return zk, "zotero" end
+    return token, "template"
+end
+
+--- Resolve a raw citation token to its entry (and itemID) honouring both the
+--- Zotero-key and template schemes when in "zotero" key_type.
+---@param token string
+---@param kt string
+---@return table|nil entry, any|nil itemID
+local function entry_by_token(token, kt)
+    if kt == "zotero" then
+        local key, scheme = M.parse_key(token)
+        local field = scheme == "zotero" and "zotkey" or "citekey"
+        for id, v in pairs(entry) do
+            if v[field] == key then return v, id end
+        end
+        return nil
+    end
+    for id, v in pairs(entry) do
+        if v.citekey == token then return v, id end
+    end
+    return nil
+end
+
 --- Reads profile.ini to find prefs.js and then find the values of `data_dir`
 --- and `attachment_dir`.
 ---@return string?, string?
@@ -560,8 +598,8 @@ local function sanitize(s)
 end
 
 ---@param item table The Zotero item
----@param ktype string Type of citation key
-local function get_bib_ref(item, ktype)
+---@param entrykey string The key to use for the BibTeX entry (@type{<entrykey>,...})
+local function get_bib_ref(item, entrykey)
     local e = {}
     e = vim.tbl_extend("force", e, item)
 
@@ -620,8 +658,7 @@ local function get_bib_ref(item, ktype)
         end
     end
 
-    local ekey = ktype == "zotero" and e.zotkey or e.citekey
-    local ref = { "@" .. e["etype"] .. "{" .. ekey .. "," }
+    local ref = { "@" .. e["etype"] .. "{" .. entrykey .. "," }
     for _, aa in pairs({
         "author",
         "editor",
@@ -697,9 +734,17 @@ end
 local function get_bib(keys, ktype)
     local ref = {}
     for _, k in pairs(keys) do
-        for _, e in pairs(entry) do
-            local key = ktype == "zotero" and e.zotkey or e.citekey
-            if k == key then ref[k] = get_bib_ref(e, ktype) end
+        local e = entry_by_token(k, ktype)
+        if e then
+            -- Key the .bib entry by the canonical form citeproc will look up:
+            -- the Zotero item key for zotero-scheme tokens (the zotref.lua filter
+            -- strips the "#"/"-"/"+" visible suffix), or the template citekey.
+            local entrykey = e.citekey
+            if ktype == "zotero" then
+                local _, scheme = M.parse_key(k)
+                if scheme == "zotero" then entrykey = e.zotkey end
+            end
+            ref[entrykey] = get_bib_ref(e, entrykey)
         end
     end
     return ref
@@ -752,29 +797,25 @@ end
 function M.get_attachment(key)
     local attachments = {}
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-    local field = kt == "zotero" and "zotkey" or "citekey"
-    for k, _ in pairs(entry) do
-        if entry[k][field] == key then
-            local query = "SELECT items.itemID, items.key, itemAttachments.path"
-                .. " FROM items, itemAttachments"
-                .. " WHERE items.itemID = itemAttachments.itemID and itemAttachments.parentItemID = '"
-                .. k
-                .. "'"
-            local sql_data = get_sql_data(query)
-            if not sql_data then return nil, "SQL query failed" end
-            for _, v in pairs(sql_data) do
-                if type(v.path) == "string" then
-                    table.insert(attachments, v)
-                else
-                    zwarn("Path is not a string: " .. vim.inspect(v.path))
-                end
-            end
-
-            if #attachments == 0 then return nil, "No attachments found" end
-            return attachments, ""
+    local _, k = entry_by_token(key, kt)
+    if not k then return nil, "Citation key not found" end
+    local query = "SELECT items.itemID, items.key, itemAttachments.path"
+        .. " FROM items, itemAttachments"
+        .. " WHERE items.itemID = itemAttachments.itemID and itemAttachments.parentItemID = '"
+        .. k
+        .. "'"
+    local sql_data = get_sql_data(query)
+    if not sql_data then return nil, "SQL query failed" end
+    for _, v in pairs(sql_data) do
+        if type(v.path) == "string" then
+            table.insert(attachments, v)
+        else
+            zwarn("Path is not a string: " .. vim.inspect(v.path))
         end
     end
-    return nil, "Citation key not found"
+
+    if #attachments == 0 then return nil, "No attachments found" end
+    return attachments, ""
 end
 
 function M.get_all_citations()
@@ -784,6 +825,9 @@ function M.get_all_citations()
     if kt == "zotero" then
         for _, e in pairs(entry) do
             res[e.zotkey] = e.citekey
+            -- Also index by template citekey so documents that mix in
+            -- "{title}{year}" template keys (e.g. @32308year) still resolve.
+            if e.citekey then res[e.citekey] = e.citekey end
         end
     else
         for k, e in pairs(entry) do
@@ -813,27 +857,9 @@ function M.format_citation_key(zotkey, citekey, kt)
     return citekey
 end
 
-local get_ref_data_template = function(citekey)
-    for _, v in pairs(entry) do
-        if v.citekey == citekey then return v end
-    end
-    return nil
-end
-
-local get_ref_data_zotkey = function(zotkey)
-    for _, v in pairs(entry) do
-        if v.zotkey == zotkey then return v end
-    end
-    return nil
-end
-
 function M.get_ref_data(key)
     local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-    if kt == "zotero" then
-        return get_ref_data_zotkey(key)
-    else
-        return get_ref_data_template(key)
-    end
+    return (entry_by_token(key, kt))
 end
 
 local get_ft_lang = function()
@@ -862,14 +888,9 @@ local function get_ypsep(lang)
     return ypsep
 end
 
-local get_key_id = function(zotkey)
-    local key_id = nil
-    for k, v in pairs(entry) do
-        if v.zotkey == zotkey then
-            key_id = k
-            break
-        end
-    end
+local get_key_id = function(key)
+    local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
+    local _, key_id = entry_by_token(key, kt)
     return key_id
 end
 

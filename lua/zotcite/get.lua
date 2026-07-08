@@ -116,13 +116,10 @@ local citation_key_vt = function(line, pos)
         j = j + 1
     end
     local key = line:sub(i + 1, j - 1)
-    local kt = require("zotcite.config").get_key_type(vim.api.nvim_get_current_buf())
-    if kt == "zotero" then
-        if #key == 8 then return key end
-        return ""
-    else
-        return key
-    end
+    -- In zotero mode `key` is either an 8-char Zotero item key or a
+    -- "{title}{year}" template citekey (e.g. "32308year"); both are classified
+    -- and resolved downstream via zotero.parse_key, so return the token as-is.
+    return key
 end
 
 M.citation_key = function()
